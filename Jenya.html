@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Для Жени</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050510;
+            font-family: sans-serif;
+        }
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="heartCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('heartCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            init();
+        });
+
+        // Неоновая синяя палитра с картинки
+        const BLUE_SHADES = ["#3b82f6", "#60a5fa", "#893c5fd", "#2563eb", "#bfdbfe", "#1d4ed8"];
+
+        class Particle {
+            constructor(x, y, targetX, targetY, delay) {
+                this.x = x;
+                this.y = y;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                
+                this.color = BLUE_SHADES[Math.floor(Math.random() * BLUE_SHADES.length)];
+                this.size = Math.random() * 2 + 1.5;
+                this.speed = Math.random() * 0.03 + 0.02; // Скорость сборки
+                this.angle = Math.random() * Math.PI * 2;
+                this.velocity = Math.random() * 1 + 0.5;
+                this.delay = delay; // Задержка появления для эффекта рисования
+                this.alpha = 0;
+            }
+
+            update(tick) {
+                if (tick < this.delay) return;
+                
+                if (this.alpha < 1) this.alpha += 0.05;
+
+                // Магическое притяжение к целевой точке (сердце или текст)
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                
+                this.x += dx * this.speed;
+                this.y += dy * this.speed;
+
+                // Легкое покачивание (пульсация света)
+                this.x += Math.sin(tick * 0.05 + this.angle) * 0.2;
+                this.y += Math.cos(tick * 0.05 + this.angle) * 0.2;
+            }
+
+            draw() {
+                if (this.alpha <= 0) return;
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                
+                // Добавляем то самое неоновое свечение (Glow)
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        let particles = [];
+        let tick = 0;
+
+        // Математическая формула сердца
+        function getHeartPoint(t) {
+            return {
+                x: 16 * Math.pow(Math.sin(t), 3),
+                y: -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t))
+            };
+        }
+
+        function init() {
+            particles = [];
+            tick = 0;
+
+            const scale = Math.min(width, height) * 0.025; 
+            const centerX = width / 2;
+            const centerY = height * 0.4; // Чуть приподнимем сердце
+
+            // 1. Генерируем сердце (около 400 частиц)
+            for (let i = 0; i < 400; i++) {
+                const t = (i / 400) * Math.PI * 2;
+                const point = getHeartPoint(t);
+                
+                const targetX = centerX + point.x * scale;
+                const targetY = centerY + point.y * scale;
+
+                // Появляются хаотично из центра светящейся линии снизу
+                const startX = centerX + (Math.random() - 0.5) * 150;
+                const startY = height * 0.75 + (Math.random() - 0.5) * 20;
+
+                // Задержка зависит от положения, чтобы сердце «вырастало» снизу вверх
+                const delay = Math.abs(point.x) * 5 + (point.y + 15) * 5;
+
+                particles.push(new Particle(startX, startY, targetX, targetY, delay));
+            }
+
+            // 2. Генерируем надпись «Я тебя люблю, Женя»
+            // Используем скрытый оффлайн-холст, чтобы считать координаты текста
+            const textCanvas = document.createElement('canvas');
+            const tCtx = textCanvas.getContext('2d');
+            textCanvas.width = width;
+            textCanvas.height = height;
+            
+            // Настройка шрифта
+            const fontSize = Math.min(width * 0.05, 45); 
+            tCtx.font = `bold ${fontSize}px sans-serif`;
+            tCtx.fillStyle = '#white';
+            tCtx.textAlign = 'center';
+            tCtx.textBaseline = 'middle';
+            
+            // Рисуем текст внизу сердца
+            tCtx.fillText("Я тебя люблю, Женя", width / 2, height * 0.75);
+
+            const imgData = tCtx.getImageData(0, 0, width, height);
+            const data = imgData.data;
+
+            // Сканируем пиксели текста и превращаем их в точки для частиц
+            let textPoints = [];
+            const step = Math.max(1, Math.floor(fontSize / 12)); // Плотность частиц
+
+            for (let y = 0; y < height; y += step) {
+                for (let x = 0; x < width; x += step) {
+                    const alpha = data[((y * width) + x) * 4 + 3];
+                    if (alpha > 128) {
+                        textPoints.push({x, y});
+                    }
+                }
+            }
+
+            // Переносим точки текста в общую систему частиц с большой задержкой
+            textPoints.forEach((pt, index) => {
+                const startX = width / 2 + (Math.random() - 0.5) * 100;
+                const startY = height * 0.9;
+                
+                // Начинают собираться через 150 тиков (когда сердце уже готово)
+                const delay = 140 + Math.random() * 80; 
+
+                particles.push(new Particle(startX, startY, pt.x, pt.y, delay));
+            });
+        }
+
+        function loop() {
+            // Эффект легкого шлейфа (motion blur)
+            ctx.fillStyle = 'rgba(5, 5, 16, 0.2)';
+            ctx.fillRect(0, 0, width, height);
+
+            // Режим наложения «экран» делает свечение частиц ярче при пересечении
+            ctx.globalCompositeOperation = 'lighter';
+
+            particles.forEach(p => {
+                p.update(tick);
+                p.draw();
+            });
+
+            ctx.globalCompositeOperation = 'source-over';
+            
+            tick++;
+            requestAnimationFrame(loop);
+        }
+
+        init();
+        loop();
+    </script>
+</body>
+</html>
