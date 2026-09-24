@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1a1a2e">
+<title>Pixel Fox Run</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<!-- Для VK Mini App при желании подключите: <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script> -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{--gold:#ffd23f;--coral:#ff6b6b;--mint:#4ecdc4;--navy:#1a1a2e}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d0d1a;font-family:'Press Start 2P',monospace;
+    padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0)}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0d0d1a}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+  #scan{position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,0,0,.12) 3px);
+    mix-blend-mode:multiply}
+  #vig{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.55) 100%)}
+  #hud{position:absolute;top:calc(10px + env(safe-area-inset-top,0));left:0;right:0;display:flex;justify-content:space-between;
+    padding:0 14px;color:var(--gold);font-size:11px;text-shadow:2px 2px 0 #000;pointer-events:none}
+  .ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(13,13,26,.82);color:#fff8e7;text-align:center;gap:14px;padding:16px}
+  .hidden{display:none!important}
+  h1{color:var(--gold);font-size:clamp(16px,5vw,26px);text-shadow:3px 3px 0 var(--coral);margin:0 0 6px}
+  p{font-size:9px;line-height:1.8;color:var(--mint);max-width:280px;margin:0}
+  .btn{margin-top:10px;padding:12px 22px;font-family:inherit;font-size:11px;color:#1a1a2e;background:var(--gold);
+    border:3px solid #fff8e7;box-shadow:4px 4px 0 #000;cursor:pointer}
+  .btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 #000}
+  .score{font-size:13px;color:var(--coral)}
+  .rec{font-size:9px;color:var(--mint)}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="scan"></div><div id="vig"></div>
+  <div id="hud">
+    <div>СЧЁТ<br><span id="scoreTxt" style="font-size:16px">0</span></div>
+    <div style="text-align:right">РЕКОРД<br><span id="hiTxt" style="font-size:16px">0</span></div>
+  </div>
+  <div id="menu" class="ov">
+    <h1>PIXEL FOX RUN</h1>
+    <p>ТАП — ПРЫЖОК<br>СВАЙП ВНИЗ — ПОДКАТ<br>СОБИРАЙ МОНЕТЫ, БЕГИ ДАЛЬШЕ!</p>
+    <div class="btn" id="startBtn">ИГРАТЬ</div>
+  </div>
+  <div id="over" class="ov hidden">
+    <h1 style="color:var(--coral)">ИГРА ОКОНЧЕНА</h1>
+    <div class="score">СЧЁТ: <span id="finalScore">0</span></div>
+    <div class="rec" id="recTxt"></div>
+    <div class="btn" id="retryBtn">ЕЩЁ РАЗ</div>
+  </div>
+</div>
+<script>
+(function(){
+"use strict";
+// ---- Telegram / VK integration ----
+var tg = window.Telegram && window.Telegram.WebApp;
+try{ if(tg){ tg.ready(); tg.expand(); tg.setHeaderColor&&tg.setHeaderColor('#1a1a2e'); tg.setBackgroundColor&&tg.setBackgroundColor('#1a1a2e'); tg.disableVerticalSwipes&&tg.disableVerticalSwipes(); } }catch(e){}
+try{ if(window.vkBridge) vkBridge.send('VKWebAppInit'); }catch(e){}
+function haptic(t){ try{ if(tg&&tg.HapticFeedback){ if(t=='hit') tg.HapticFeedback.notificationOccurred('error'); else if(t=='coin') tg.HapticFeedback.impactOccurred('light'); else tg.HapticFeedback.impactOccurred('medium'); } }catch(e){} }
+
+// ---- Canvas / resolution ----
+var GW=384,GH=216,GROUND=180,PX=3;
+var canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+canvas.width=GW;canvas.height=GH;ctx.imageSmoothingEnabled=false;
+function resize(){var vw=innerWidth,vh=innerHeight,s=Math.min(vw/GW,vh/GH);canvas.style.width=(GW*s)+'px';canvas.style.height=(GH*s)+'px';}
+addEventListener('resize',resize);resize();
+
+// ---- Audio ----
+var actx;function beep(f,d,type,vol){try{
+  actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+  var o=actx.createOscillator(),g=actx.createGain();o.type=type||'square';o.frequency.value=f;
+  g.gain.value=vol||.12;o.connect(g);g.connect(actx.destination);o.start();
+  g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+d);o.stop(actx.currentTime+d);
+}catch(e){}}
+function sJump(){beep(520,.09,'square',.1)}
+function sCoin(){beep(880,.05,'sine',.12);setTimeout(function(){beep(1200,.06,'sine',.1)},40)}
+function sHit(){beep(110,.3,'sawtooth',.15)}
+function sStart(){beep(440,.08,'square',.1);setTimeout(function(){beep(660,.1,'square',.1)},90)}
+
+// ---- Colors ----
+var COL={fox:'#ff8c42',foxD:'#c9631f',cream:'#fff3d6',dark:'#1a1a2e',dirt:'#5c3a21',grass:'#4a8f3c',
+  grassD:'#356b2b',rock:'#7d7d8a',rockD:'#54545e',spike:'#cfcfe0',crow:'#2e2e3a',gold:'#ffd23f',goldD:'#c99c1f'};
+
+function lerp(a,b,t){return a+(b-a)*t}
+function hx2rgb(h){var n=parseInt(h.slice(1),16);return[n>>16&255,n>>8&255,n&255]}
+function lerpC(c1,c2,t){var a=hx2rgb(c1),b=hx2rgb(c2);return'rgb('+Math.round(lerp(a[0],b[0],t))+','+Math.round(lerp(a[1],b[1],t))+','+Math.round(lerp(a[2],b[2],t))+')'}
+var SKY=[['#1b1035','#3a2060'],['#2a4a7a','#7fb8d8'],['#3a6bb8','#bfe6ff'],['#a84a6a','#ff9d5c'],['#1b1035','#3a2060']];
+
+function drawRects(list,ox,oy,color,flip,wgrid){
+  ctx.fillStyle=color;
+  for(var i=0;i<list.length;i++){var r=list[i];var x=flip?(wgrid-r[0]-r[2]):r[0];
+    ctx.fillRect(ox+x*PX,oy+r[1]*PX,r[2]*PX,r[3]*PX);}
+}
+
+// ---- Fox sprite (16-wide grid) ----
+var FOX_BODY=[[2,5,10,5]],FOX_HEAD=[[10,2,5,4],[13,1,2,2]],FOX_SNOUT=[[14,4,2,2]],
+  FOX_BELLY=[[3,7,7,3]],FOX_EYE=[[13,3,1,1]],FOX_TAIL=[[0,2,2,2],[1,3,2,3]],
+  LEG_A=[[3,10,2,3],[9,10,2,2]],LEG_B=[[3,10,2,2],[9,10,2,3]],DUCK_BODY=[[1,8,12,4]];
+
+function drawFox(x,y,frame,ducking,jumping){
+  var ox=x,oy=y;
+  if(ducking){
+    drawRects(DUCK_BODY,ox,oy,COL.fox,0,16);
+    drawRects([[11,7,4,3]],ox,oy,COL.fox,0,16);
+    drawRects([[9,8,2,2]],ox,oy,COL.cream,0,16);
+    drawRects([[13,8,1,1]],ox,oy,COL.dark,0,16);
+    return;
+  }
+  drawRects(FOX_TAIL,ox,oy,COL.foxD,0,16);
+  drawRects(jumping?LEG_A:(frame?LEG_A:LEG_B),ox,oy,COL.foxD,0,16);
+  drawRects(FOX_BODY,ox,oy,COL.fox,0,16);
+  drawRects(FOX_BELLY,ox,oy,COL.cream,0,16);
+  drawRects(FOX_HEAD,ox,oy,COL.fox,0,16);
+  drawRects(FOX_SNOUT,ox,oy,COL.cream,0,16);
+  drawRects(FOX_EYE,ox,oy,COL.dark,0,16);
+}
+function drawCrow(x,y,flap){
+  drawRects([[1,3,8,3]],x,y,COL.crow,0,10);
+  drawRects([[7,2,3,2]],x,y,COL.crow,0,10);
+  drawRects(flap?[[2,1,4,2]]:[[2,4,4,2]],x,y,COL.crow,0,10);
+  drawRects([[0,5,3,2]],x,y,COL.crow,0,10);
+}
+function drawRock(x,y,w,h){
+  ctx.fillStyle=COL.rockD;ctx.fillRect(x,y+h*.3,w,h*.7);
+  ctx.fillStyle=COL.rock;ctx.fillRect(x+2,y,w-4,h*.75);
+}
+function drawSpike(x,y,w,h){
+  ctx.fillStyle=COL.spike;ctx.beginPath();ctx.moveTo(x,y+h);ctx.lineTo(x+w/2,y);ctx.lineTo(x+w,y+h);ctx.closePath();ctx.fill();
+}
+function drawCoin(x,y,t){
+  var sc=Math.abs(Math.sin(t*7));
+  ctx.save();ctx.translate(x,y);ctx.scale(0.25+sc*0.9,1);
+  ctx.fillStyle=COL.goldD;ctx.beginPath();ctx.arc(0,0,7,0,7);ctx.fill();
+  ctx.fillStyle=COL.gold;ctx.beginPath();ctx.arc(0,0,5,0,7);ctx.fill();
+  ctx.restore();
+}
+
+// ---- Game state ----
+var state='menu',distance=0,speed=140,score=0,coins=0,hi=+(localStorage.getItem('pfr_hi')||0);
+document.getElementById('hiTxt').textContent=hi;
+var GRAV=900,JUMPV=-330,BASESPD=140,MAXSPD=340,ACCEL=0.018;
+var player={x:44,y:GROUND-42,w:34,h:42,vy:0,grounded:true,ducking:false,frame:0,ft:0};
+var obstacles=[],coinsArr=[],particles=[],spawnT=1.2,shakeT=0,shakeM=0,tGlobal=0;
+
+function resetGame(){
+  distance=0;speed=BASESPD;score=0;coins=0;obstacles=[];coinsArr=[];particles=[];
+  player.y=GROUND-42;player.vy=0;player.grounded=true;player.ducking=false;spawnT=1.0;shakeT=0;
+}
+function jump(){ if(state=='playing'&&player.grounded&&!player.ducking){ player.vy=JUMPV;player.grounded=false;sJump();haptic('jump'); } }
+function setDuck(v){ if(state!='playing')return; if(v&&!player.grounded)return; player.ducking=v; }
+
+function spawnStuff(){
+  var r=Math.random();
+  if(r<0.55){ // ground obstacle
+    if(Math.random()<0.5) obstacles.push({x:GW+10,y:GROUND-16,w:16,h:16,type:'spike'});
+    else obstacles.push({x:GW+10,y:GROUND-20,w:22,h:20,type:'rock'});
+  } else if(r<0.8){ // flying obstacle -> duck
+    obstacles.push({x:GW+10,y:GROUND-56,w:30,h:22,type:'crow'});
+  } else { // coin arc
+    var n=5,cx=GW+20;
+    for(var i=0;i<n;i++) coinsArr.push({x:cx+i*16,y:GROUND-40-Math.sin(i/(n-1)*Math.PI)*40,t:Math.random()*3});
+  }
+  spawnT=1.0+Math.random()*0.7;
+}
+function addParticles(x,y,n,color,spread){
+  for(var i=0;i<n;i++) particles.push({x:x,y:y,vx:(Math.random()-.5)*spread,vy:-Math.random()*spread,life:0.4+Math.random()*.3,color:color,size:2+Math.random()*2});
+}
+function collide(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+
+function gameOver(){
+  state='over';sHit();haptic('hit');shakeT=0.3;shakeM=6;
+  score=Math.floor(score);
+  var rec=false; if(score>hi){hi=score;localStorage.setItem('pfr_hi',hi);rec=true;document.getElementById('hiTxt').textContent=hi;}
+  document.getElementById('finalScore').textContent=score;
+  document.getElementById('recTxt').textContent=rec?'НОВЫЙ РЕКОРД!':'';
+  document.getElementById('over').classList.remove('hidden');
+}
+function startGame(){ resetGame(); state='playing'; sStart(); document.getElementById('menu').classList.add('hidden'); document.getElementById('over').classList.add('hidden'); }
+
+// ---- Input ----
+var sx=0,sy=0,moved=false;
+function down(e){ var p=e.touches?e.touches[0]:e; sx=p.clientX;sy=p.clientY;moved=false;
+  if(state=='menu'){startGame();return;} if(state=='over'){startGame();return;} }
+function move(e){ if(state!='playing')return; var p=e.touches?e.touches[0]:e; var dy=p.clientY-sy;
+  if(dy>26&&!moved){ setDuck(true); moved=true; } }
+function up(e){ if(state!='playing')return; if(!moved) jump(); else setDuck(false); }
+canvas.addEventListener('mousedown',down);canvas.addEventListener('mousemove',move);addEventListener('mouseup',up);
+canvas.addEventListener('touchstart',function(e){down(e);e.preventDefault();},{passive:false});
+canvas.addEventListener('touchmove',function(e){move(e);e.preventDefault();},{passive:false});
+canvas.addEventListener('touchend',function(e){up(e);e.preventDefault();},{passive:false});
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('retryBtn').addEventListener('click',startGame);
+addEventListener('keydown',function(e){
+  if((e.code=='Space'||e.code=='ArrowUp')){ if(state!='playing'){startGame();} else jump(); e.preventDefault(); }
+  if(e.code=='ArrowDown'){ setDuck(true); }
+});
+addEventListener('keyup',function(e){ if(e.code=='ArrowDown') setDuck(false); });
+
+// ---- Update & render ----
+var last=performance.now();
+function loop(now){
+  var dt=Math.min((now-last)/1000,0.033); last=now; tGlobal+=dt;
+  update(dt); render(); requestAnimationFrame(loop);
+}
+function update(dt){
+  if(shakeT>0) shakeT-=dt;
+  if(state!='playing') return;
+  speed=Math.min(MAXSPD, BASESPD+distance*ACCEL);
+  distance+=speed*dt; score=distance/3+coins*5;
+  document.getElementById('scoreTxt').textContent=Math.floor(score);
+
+  var gy=GROUND-(player.ducking?24:42);
+  if(!player.grounded){ player.vy+=GRAV*dt; player.y+=player.vy*dt;
+    if(player.y>=gy){ player.y=gy; player.vy=0; player.grounded=true; addParticles(player.x+16,GROUND-2,6,'#cbb08a',60); } }
+  else player.y=gy;
+  player.ft+=dt; if(player.ft>0.11){player.ft=0;player.frame=1-player.frame;
+    if(player.grounded&&!player.ducking) addParticles(player.x+4,GROUND-2,1,'#cbb08a',20); }
+
+  spawnT-=dt; if(spawnT<=0) spawnStuff();
+  var ph={x:player.x+6,y:player.y+(player.ducking?6:4),w:player.w-12,h:player.h-(player.ducking?10:8)};
+  for(var i=obstacles.length-1;i>=0;i--){ var o=obstacles[i]; o.x-=speed*dt;
+    if(o.x+o.w<0){obstacles.splice(i,1);continue;}
+    if(collide(ph,o)){ gameOver(); return; } }
+  for(var j=coinsArr.length-1;j>=0;j--){ var c=coinsArr[j]; c.x-=speed*dt; c.t+=dt;
+    if(c.x<-10){coinsArr.splice(j,1);continue;}
+    if(Math.abs(c.x-(player.x+16))<16 && Math.abs(c.y-(player.y+16))<18){
+      coinsArr.splice(j,1); coins++; sCoin(); haptic('coin'); addParticles(c.x,c.y,8,'#ffd23f',80); } }
+  for(var k=particles.length-1;k>=0;k--){ var p=particles[k]; p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=300*dt;
+    if(p.life<=0) particles.splice(k,1); }
+}
+
+function render(){
+  ctx.save();
+  if(shakeT>0){ ctx.translate((Math.random()-.5)*shakeM,(Math.random()-.5)*shakeM); }
+  var phase=(distance/2600)%1, seg=phase*4, idx=Math.floor(seg), ft=seg-idx;
+  var top=lerpC(SKY[idx][0],SKY[idx+1][0],ft), bot=lerpC(SKY[idx][1],SKY[idx+1][1],ft);
+  var g=ctx.createLinearGradient(0,0,0,GROUND); g.addColorStop(0,top); g.addColorStop(1,bot);
+  ctx.fillStyle=g; ctx.fillRect(-10,-10,GW+20,GROUND+10);
+
+  var hOff=-(distance*0.15)%80;
+  ctx.fillStyle='rgba(20,15,45,0.35)';
+  for(var i=-1;i<6;i++){ var hx=hOff+i*80; ctx.beginPath(); ctx.moveTo(hx,GROUND); ctx.lineTo(hx+40,GROUND-46); ctx.lineTo(hx+80,GROUND); ctx.fill(); }
+  var cOff=-(distance*0.35)%140;
+  ctx.fillStyle='rgba(255,255,255,0.18)';
+  for(var i=-1;i<5;i++){ var cx=cOff+i*140; ctx.fillRect(cx,30,26,7); ctx.fillRect(cx+7,24,14,7); }
+
+  ctx.fillStyle=COL.dirt; ctx.fillRect(0,GROUND,GW,GH-GROUND);
+  ctx.fillStyle=COL.grass; ctx.fillRect(0,GROUND,GW,4);
+  var gOff=-(distance)%16;
+  ctx.fillStyle=COL.grassD;
+  for(var x=gOff;x<GW;x+=16) ctx.fillRect(x,GROUND+2,8,GH-GROUND-2);
+
+  for(var i=0;i<coinsArr.length;i++) drawCoin(coinsArr[i].x,coinsArr[i].y,coinsArr[i].t);
+  for(var i=0;i<obstacles.length;i++){ var o=obstacles[i];
+    if(o.type=='spike') drawSpike(o.x,o.y,o.w,o.h);
+    else if(o.type=='rock') drawRock(o.x,o.y,o.w,o.h);
+    else drawCrow(o.x,o.y,Math.sin(tGlobal*10)>0); }
+  for(var i=0;i<particles.length;i++){ var p=particles[i]; ctx.globalAlpha=Math.max(p.life,0); ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,p.size,p.size); ctx.globalAlpha=1; }
+
+  drawFox(player.x,player.y,player.frame,player.ducking,!player.grounded);
+  ctx.restore();
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
