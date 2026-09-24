@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#fdf6ea">
+<title>Лисьи Владения</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--cream:#fdf6ea;--ink:#3d2b1f;--rust:#e07a5f;--gold:#f4a259;--green:#8cb369;--heart:#e5533d}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+  html,body{margin:0;min-height:100%;background:var(--cream);font-family:'Fredoka',sans-serif;color:var(--ink);
+    padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0)}
+  #app{display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:10px 12px 20px;gap:10px}
+  h1{font-size:clamp(20px,6vw,30px);margin:6px 0 0;text-align:center}
+  .sub{font-size:13px;opacity:.75;text-align:center;max-width:420px;line-height:1.5;margin:0 0 4px}
+  .hud{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:480px;font-size:16px;font-weight:600}
+  .hearts span{opacity:.25}
+  .hearts span.on{opacity:1}
+  #board{display:grid;width:min(92vw,72vh,460px);aspect-ratio:1;gap:0;border:3px solid var(--ink);border-radius:14px;overflow:hidden;background:#fff}
+  .cell{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:clamp(14px,4vw,26px);transition:transform .1s}
+  .cell:active{transform:scale(.93)}
+  .cell.mark{color:rgba(61,43,31,.45);font-size:.5em}
+  .cell.conflict{box-shadow:inset 0 0 0 3px var(--heart);animation:shake .25s}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .btn{padding:10px 18px;border:none;border-radius:12px;background:var(--rust);color:#fff;font-family:inherit;font-weight:600;font-size:14px;cursor:pointer;box-shadow:0 3px 0 #b6543a}
+  .btn:active{transform:translateY(2px);box-shadow:0 1px 0 #b6543a}
+  .btn.alt{background:var(--green);box-shadow:0 3px 0 #5f8047}
+  .btn.alt:active{box-shadow:0 1px 0 #5f8047}
+  .btn:disabled{opacity:.4}
+  .ov{position:fixed;inset:0;background:rgba(61,43,31,.55);display:flex;align-items:center;justify-content:center;z-index:10}
+  .card{background:var(--cream);padding:26px 22px;border-radius:20px;max-width:340px;text-align:center;box-shadow:0 10px 0 rgba(61,43,31,.2)}
+  .hidden{display:none!important}
+  .diffs{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+  #timer{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>🦊 Лисьи Владения</h1>
+  <p class="sub">Лисы — территориальные звери. Помести по одной лисе в каждую цветную зону так, чтобы ни одна не стояла в одной строке, столбце или не касалась соседней по диагонали. Тап — метка, тап ещё раз — лиса.</p>
+  <div class="hud">
+    <div class="hearts" id="hearts">❤️❤️❤️</div>
+    <div id="timer">00:00</div>
+    <div id="hintsWrap">💡 <span id="hintsLeft">3</span></div>
+  </div>
+  <div id="board"></div>
+  <div class="row">
+    <button class="btn" id="hintBtn">Подсказка</button>
+    <button class="btn alt" id="clearBtn">Очистить</button>
+    <button class="btn alt" id="menuBtn">Меню</button>
+  </div>
+</div>
+
+<div class="ov" id="menuOv">
+  <div class="card">
+    <h1 style="margin-top:0">🦊 Лисьи Владения</h1>
+    <p class="sub">Выбери размер поля</p>
+    <div class="diffs">
+      <button class="btn" data-n="6">Лёгкий 6×6</button>
+      <button class="btn" data-n="8">Средний 8×8</button>
+      <button class="btn" data-n="10">Сложный 10×10</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov hidden" id="endOv">
+  <div class="card">
+    <h1 id="endTitle" style="margin-top:0">Победа!</h1>
+    <p class="sub" id="endText"></p>
+    <div class="row">
+      <button class="btn" id="againBtn">Ещё раз</button>
+      <button class="btn alt" id="endMenuBtn">Меню</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var tg=window.Telegram&&window.Telegram.WebApp;
+try{if(tg){tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#fdf6ea');tg.setBackgroundColor&&tg.setBackgroundColor('#fdf6ea');}}catch(e){}
+try{if(window.vkBridge) vkBridge.send('VKWebAppInit');}catch(e){}
+function haptic(t){try{if(tg&&tg.HapticFeedback){if(t=='bad')tg.HapticFeedback.notificationOccurred('error');else if(t=='win')tg.HapticFeedback.notificationOccurred('success');else tg.HapticFeedback.impactOccurred('light');}}catch(e){}}
+var actx;function beep(f,d,type,vol){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+  var o=actx.createOscillator(),g=actx.createGain();o.type=type||'sine';o.frequency.value=f;g.gain.value=vol||.1;
+  o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+d);o.stop(actx.currentTime+d);}catch(e){}}
+function sMark(){beep(500,.05,'square',.06)}
+function sFox(){beep(700,.06,'sine',.09)}
+function sBad(){beep(140,.25,'sawtooth',.13)}
+function sWin(){beep(523,.1,'sine',.1);setTimeout(function(){beep(659,.1,'sine',.1)},100);setTimeout(function(){beep(784,.16,'sine',.12)},200);}
+
+var PAL=['#f4a259','#8cb369','#5b8c9c','#e07a5f','#bc6c25','#9b8cbf','#e9c46a','#6a994e','#d68c9a','#457b9d'];
+var n,reg,sol,grid,hearts,hintsLeft,startTime,timerId,running=false;
+
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
+
+function genSolution(size){
+  var cols=new Array(size),used=new Array(size).fill(false);
+  function bt(row){
+    if(row===size) return true;
+    var order=shuffle([...Array(size).keys()]);
+    for(var k=0;k<order.length;k++){
+      var c=order[k];
+      if(used[c]) continue;
+      if(row>0 && Math.abs(c-cols[row-1])<=1) continue;
+      cols[row]=c;used[c]=true;
+      if(bt(row+1)) return true;
+      used[c]=false;
+    }
+    return false;
+  }
+  if(!bt(0)) return genSolution(size);
+  return cols;
+}
+function genRegions(size,cols){
+  var r=[];for(var i=0;i<size;i++)r.push(new Array(size).fill(-1));
+  for(var i=0;i<size;i++)r[i][cols[i]]=i;
+  var frontier=[];
+  function push(region,rr,cc){
+    var d=[[1,0],[-1,0],[0,1],[0,-1]];
+    for(var k=0;k<4;k++){var nr=rr+d[k][0],nc=cc+d[k][1];
+      if(nr>=0&&nr<size&&nc>=0&&nc<size&&r[nr][nc]===-1) frontier.push([region,nr,nc]);}
+  }
+  for(var i=0;i<size;i++) push(i,i,cols[i]);
+  while(frontier.length){
+    var idx=Math.floor(Math.random()*frontier.length);
+    var f=frontier.splice(idx,1)[0];
+    if(r[f[1]][f[2]]!==-1) continue;
+    r[f[1]][f[2]]=f[0];
+    push(f[0],f[1],f[2]);
+  }
+  return r;
+}
+
+function newGame(size){
+  n=size; sol=genSolution(n); reg=genRegions(n,sol);
+  grid=[];for(var i=0;i<n;i++) grid.push(new Array(n).fill(0));
+  hearts=3; hintsLeft=3; startTime=Date.now(); running=true;
+  document.getElementById('menuOv').classList.add('hidden');
+  document.getElementById('endOv').classList.add('hidden');
+  buildBoard(); updateHUD();
+  clearInterval(timerId); timerId=setInterval(tick,1000); tick();
+}
+function tick(){
+  if(!running) return;
+  var s=Math.floor((Date.now()-startTime)/1000);
+  var mm=String(Math.floor(s/60)).padStart(2,'0'),ss=String(s%60).padStart(2,'0');
+  document.getElementById('timer').textContent=mm+':'+ss;
+}
+function updateHUD(){
+  var h=''; for(var i=0;i<3;i++) h+='<span class="'+(i<hearts?'on':'')+'">❤️</span>';
+  document.getElementById('hearts').innerHTML=h;
+  document.getElementById('hintsLeft').textContent=hintsLeft;
+  document.getElementById('hintBtn').disabled=hintsLeft<=0;
+}
+
+function buildBoard(){
+  var b=document.getElementById('board');
+  b.innerHTML=''; b.style.gridTemplateColumns='repeat('+n+',1fr)';
+  for(var r=0;r<n;r++) for(var c=0;c<n;c++){
+    var d=document.createElement('div'); d.className='cell';
+    d.style.background=PAL[reg[r][c]%PAL.length];
+    d.dataset.r=r; d.dataset.c=c;
+    var top=(r===0||reg[r-1][c]!==reg[r][c])?'3px solid #3d2b1f':'1px solid rgba(61,43,31,.22)';
+    var left=(c===0||reg[r][c-1]!==reg[r][c])?'3px solid #3d2b1f':'1px solid rgba(61,43,31,.22)';
+    d.style.borderTop=top; d.style.borderLeft=left;
+    if(r===n-1) d.style.borderBottom='3px solid #3d2b1f';
+    if(c===n-1) d.style.borderRight='3px solid #3d2b1f';
+    d.addEventListener('click',function(){onClick(+this.dataset.r,+this.dataset.c)});
+    b.appendChild(d);
+  }
+  render();
+}
+function cellEl(r,c){return document.querySelector('.cell[data-r="'+r+'"][data-c="'+c+'"]')}
+
+function conflicts(r,c){
+  var out=[];
+  for(var i=0;i<n;i++) for(var j=0;j<n;j++){
+    if(i===r&&j===c) continue;
+    if(grid[i][j]!==2) continue;
+    if(i===r||j===c||reg[i][j]===reg[r][c]||(Math.abs(i-r)===1&&Math.abs(j-c)===1)) out.push([i,j]);
+  }
+  return out;
+}
+function autoMark(r,c){
+  for(var i=0;i<n;i++) for(var j=0;j<n;j++){
+    if(grid[i][j]!==0) continue;
+    if(i===r||j===c||reg[i][j]===reg[r][c]||(Math.abs(i-r)<=1&&Math.abs(j-c)<=1)) grid[i][j]=1;
+  }
+}
+
+function onClick(r,c){
+  if(!running) return;
+  var cur=grid[r][c];
+  if(cur===0){grid[r][c]=1;sMark();}
+  else if(cur===1){grid[r][c]=2;sFox();
+    var conf=conflicts(r,c);
+    if(conf.length){hearts--;sBad();haptic('bad');updateHUD();
+      if(hearts<=0){render();return endGame(false);}
+    } else { autoMark(r,c); haptic(); }
+  } else {grid[r][c]=0;}
+  render();
+  checkWin();
+}
+function render(){
+  for(var r=0;r<n;r++) for(var c=0;c<n;c++){
+    var el=cellEl(r,c),s=grid[r][c];
+    el.className='cell';
+    el.textContent = s===2?'🦊':(s===1?'•':'');
+    if(s===1) el.classList.add('mark');
+    if(s===2 && conflicts(r,c).length) el.classList.add('conflict');
+  }
+}
+function checkWin(){
+  var count=0,bad=false;
+  for(var r=0;r<n;r++) for(var c=0;c<n;c++){
+    if(grid[r][c]===2){count++; if(conflicts(r,c).length) bad=true;}
+  }
+  if(count===n && !bad) endGame(true);
+}
+function endGame(win){
+  running=false; clearInterval(timerId);
+  var t=document.getElementById('timer').textContent;
+  document.getElementById('endTitle').textContent=win?'🎉 Победа!':'😿 Лисы разбежались';
+  document.getElementById('endText').textContent=win?('Territoрии распределены за '+t+'!'):'Сердечки закончились. Попробуй снова!';
+  if(win) sWin(); haptic(win?'win':'bad');
+  document.getElementById('endOv').classList.remove('hidden');
+}
+
+document.getElementById('hintBtn').addEventListener('click',function(){
+  if(hintsLeft<=0||!running) return;
+  var rows=[]; for(var r=0;r<n;r++) if(!(grid[r][sol[r]]===2)) rows.push(r);
+  if(!rows.length) return;
+  var r=rows[Math.floor(Math.random()*rows.length)],c=sol[r];
+  grid[r][c]=2; autoMark(r,c); hintsLeft--; updateHUD(); render(); sFox(); checkWin();
+});
+document.getElementById('clearBtn').addEventListener('click',function(){
+  if(!running) return;
+  for(var r=0;r<n;r++) for(var c=0;c<n;c++) grid[r][c]=0;
+  render();
+});
+document.getElementById('menuBtn').addEventListener('click',function(){running=false;clearInterval(timerId);document.getElementById('menuOv').classList.remove('hidden');});
+document.getElementById('endMenuBtn').addEventListener('click',function(){document.getElementById('endOv').classList.add('hidden');document.getElementById('menuOv').classList.remove('hidden');});
+document.getElementById('againBtn').addEventListener('click',function(){newGame(n);});
+document.querySelectorAll('#menuOv [data-n]').forEach(function(b){b.addEventListener('click',function(){newGame(+this.dataset.n);})});
+})();
+</script>
+</body>
+</html>
