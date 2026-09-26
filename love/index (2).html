@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Вдвоём — игра для двоих</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💞</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ================= ЭКРАН 1: ЗАГРУЗКА ================= -->
+  <section id="view-loading" class="view view-loading">
+    <div class="loader-heart">💗</div>
+    <p class="loader-text">Соединяемся…</p>
+  </section>
+
+  <!-- ================= ЭКРАН 2: ГЛАВНОЕ МЕНЮ ================= -->
+  <section id="view-menu" class="view" hidden>
+    <header class="menu-hero">
+      <div class="menu-badge">Вдвоём</div>
+      <h1 class="menu-title">Насколько хорошо<br>вы знаете друг друга?</h1>
+      <p class="menu-sub">10 вопросов. Живые ответы. Никакой подготовки.</p>
+    </header>
+
+    <div class="you-card" id="you-card">
+      <div class="you-avatar" id="you-avatar">🙂</div>
+      <div class="you-info">
+        <div class="you-name" id="you-name">Гость</div>
+        <div class="you-label">это вы</div>
+      </div>
+    </div>
+
+    <!-- Нет пары -->
+    <div id="pair-block-empty" class="card-block">
+      <div class="card-block-title">Ваш код</div>
+      <div class="code-row">
+        <div class="code-pill" id="my-code">••••••</div>
+        <button class="icon-btn" id="copy-code-btn" title="Скопировать">Скопировать</button>
+      </div>
+      <p class="card-hint">Отправьте этот код второй половинке, либо введите её код ниже.</p>
+
+      <div class="divider"><span>или</span></div>
+
+      <div class="join-row">
+        <input id="partner-code-input" class="text-input" maxlength="6" placeholder="Код партнёра" autocomplete="off">
+        <button class="btn btn-primary" id="join-btn">Добавить</button>
+      </div>
+      <p class="form-msg" id="join-msg"></p>
+    </div>
+
+    <!-- Есть пара -->
+    <div id="pair-block-ready" class="card-block" hidden>
+      <div class="card-block-title">Вы в паре</div>
+      <div class="partner-row">
+        <div class="partner-avatar" id="partner-avatar">💕</div>
+        <div>
+          <div class="partner-name" id="partner-name">—</div>
+          <div class="partner-status">готов(а) играть</div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-lg" id="start-game-btn">Начать игру</button>
+      <button class="btn btn-ghost" id="unpair-btn">Отвязать партнёра</button>
+    </div>
+
+    <div id="lobby-waiting" class="card-block" hidden>
+      <div class="pulse-dot"></div>
+      <p class="card-hint center">Партнёр запускает игру…</p>
+    </div>
+
+    <footer class="menu-footer">
+      <p>Вопросы одинаковы для двоих — отвечайте честно и в живую 💬</p>
+    </footer>
+  </section>
+
+  <!-- ================= ЭКРАН 3: ИГРА ================= -->
+  <section id="view-game" class="view" hidden>
+    <header class="game-top">
+      <div class="progress-track" id="progress-track"></div>
+      <div class="game-counter"><span id="q-index">1</span>/<span id="q-total">10</span></div>
+    </header>
+
+    <div class="question-sticker">
+      <p class="question-text" id="question-text">Загрузка вопроса…</p>
+    </div>
+
+    <div class="answers-stage" id="answers-stage">
+      <div class="answer-slot slot-partner" id="slot-partner" hidden>
+        <div class="bubble-avatar" id="bubble-partner-avatar">💕</div>
+        <div class="bubble bubble-partner">
+          <div class="bubble-name" id="bubble-partner-name">Партнёр</div>
+          <div class="bubble-text" id="bubble-partner-text"></div>
+        </div>
+      </div>
+      <div class="answer-slot slot-you" id="slot-you" hidden>
+        <div class="bubble bubble-you">
+          <div class="bubble-name">Вы</div>
+          <div class="bubble-text" id="bubble-you-text"></div>
+        </div>
+        <div class="bubble-avatar" id="bubble-you-avatar">🙂</div>
+      </div>
+      <p class="waiting-hint" id="waiting-hint" hidden>Ждём ответ партнёра…</p>
+      <p class="next-hint" id="next-hint" hidden>Следующий вопрос через мгновение… 💫</p>
+    </div>
+
+    <form class="answer-bar" id="answer-form">
+      <input class="text-input answer-input" id="answer-input" placeholder="Ваш ответ…" autocomplete="off" maxlength="200">
+      <button class="send-btn" id="send-btn" type="submit" aria-label="Отправить">➤</button>
+    </form>
+  </section>
+
+  <!-- ================= ЭКРАН 4: ФИНАЛ ================= -->
+  <section id="view-end" class="view" hidden>
+    <div class="end-emoji">🎉</div>
+    <h2 class="end-title">Игра окончена!</h2>
+    <p class="end-sub">Вы прошли все 10 вопросов вместе.</p>
+    <button class="btn btn-primary btn-lg" id="play-again-btn">Сыграть ещё раз</button>
+    <button class="btn btn-ghost" id="to-menu-btn">В меню</button>
+  </section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
