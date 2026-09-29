@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вдвоём · Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #14101a; color: #f2ecf7; font-family: system-ui, sans-serif; padding: 20px; max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: #a595aa; font-size: 13px; margin-bottom: 20px; }
+  .card { background: #201a27; border: 1px solid #332a3c; border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 14px; margin: 0 0 12px; color: #d8c9e0; }
+  input, select, button { font: inherit; }
+  input, select { width: 100%; background: #14101a; border: 1px solid #3a2f45; color: #f2ecf7; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 14px; font-weight: 700; background: #ff5d8f; color: #fff; }
+  button.secondary { background: #332a3c; color: #f2ecf7; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .player-line { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px dashed #332a3c; }
+  .player-line b { color: #fff; }
+  .msg { font-size: 13px; margin-top: 8px; min-height: 16px; }
+  .msg.ok { color: #6ede9c; }
+  .msg.err { color: #ff8fab; }
+  .badge-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .badge { background: #332a3c; border-radius: 999px; padding: 3px 10px; font-size: 12px; }
+  #gate { display: flex; flex-direction: column; gap: 10px; max-width: 320px; margin: 80px auto; }
+  #app { display: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  td, th { text-align: left; padding: 5px 4px; border-bottom: 1px solid #2a2232; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1>🔒 Вдвоём · Admin</h1>
+  <input id="pass-input" type="password" placeholder="Пароль">
+  <button id="pass-btn">Войти</button>
+  <p class="msg err" id="pass-msg"></p>
+</div>
+
+<div id="app">
+  <h1>Админ-панель «Вдвоём»</h1>
+  <p class="sub">Эта страница нигде не связана из самого приложения — прямая ссылка + пароль. Файл специально не входит ни в одно меню.</p>
+
+  <div class="card">
+    <h2>Найти пару по коду игрока</h2>
+    <input id="search-code" placeholder="Например, A1B2C3" maxlength="6">
+    <button id="search-btn">Найти</button>
+    <p class="msg" id="search-msg"></p>
+  </div>
+
+  <div class="card" id="result-card" style="display:none">
+    <h2>Результат</h2>
+    <div id="players-info"></div>
+    <div id="couple-info"></div>
+  </div>
+
+  <div class="card" id="actions-card" style="display:none">
+    <h2>Выдать тему оформления</h2>
+    <select id="theme-select"></select>
+    <button id="grant-theme-btn">Выдать паре</button>
+    <p class="msg" id="theme-msg"></p>
+
+    <h2 style="margin-top:18px">Выдать достижение</h2>
+    <select id="achv-select"></select>
+    <button id="grant-achv-btn">Выдать обоим</button>
+    <p class="msg" id="achv-msg"></p>
+
+    <h2 style="margin-top:18px">Изменить XP пары</h2>
+    <div class="row">
+      <input id="xp-amount" type="number" placeholder="Например 100 или -50">
+      <button id="xp-btn">Применить</button>
+    </div>
+    <p class="msg" id="xp-msg"></p>
+  </div>
+
+  <div class="card">
+    <h2>Последние оплаты Stars</h2>
+    <button class="secondary" id="load-payments-btn">Обновить список</button>
+    <div id="payments-table" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

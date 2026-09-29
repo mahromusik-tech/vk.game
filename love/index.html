@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Вдвоём</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💞</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ================= ЗАГРУЗКА ================= -->
+  <section id="view-loading" class="view view-loading">
+    <div class="loader-heart">💗</div>
+    <p class="loader-text">Соединяемся…</p>
+  </section>
+
+  <!-- ================= ОСНОВНОЕ ПРИЛОЖЕНИЕ ================= -->
+  <div id="app-main" hidden>
+
+    <header class="topbar">
+      <div class="topbar-brand">💞 Вдвоём</div>
+      <button class="bell-btn" id="bell-btn" aria-label="Уведомления">
+        🔔<span class="bell-badge" id="bell-badge" hidden>0</span>
+      </button>
+    </header>
+
+    <main class="tab-content">
+
+      <!-- ---------- ВКЛАДКА: ПРОФИЛЬ ---------- -->
+      <section class="tab-panel" id="tab-profile">
+        <div class="you-card" id="you-card">
+          <div class="you-avatar" id="you-avatar">🙂</div>
+          <div class="you-info">
+            <div class="you-name" id="you-name">Гость</div>
+            <div class="you-label">код: <b id="my-code-inline">••••••</b></div>
+          </div>
+          <button class="icon-btn small" id="copy-code-btn">Копировать</button>
+        </div>
+
+        <!-- Нет партнёра -->
+        <div id="no-partner-block" class="card-block">
+          <div class="card-block-title">Пригласить партнёра</div>
+          <p class="card-hint">Введите код второй половинки и дату начала ваших отношений — партнёр получит запрос в уведомлениях.</p>
+          <input id="partner-code-input" class="text-input" maxlength="6" placeholder="Код партнёра" autocomplete="off">
+          <div class="field-row">
+            <label class="field-label" for="started-at-input">Дата начала отношений</label>
+            <input id="started-at-input" class="text-input" type="date">
+          </div>
+          <button class="btn btn-primary btn-lg" id="send-request-btn">Отправить запрос</button>
+          <p class="form-msg" id="request-msg"></p>
+        </div>
+
+        <!-- Есть партнёр -->
+        <div id="has-partner-block" class="card-block" hidden>
+          <div class="partner-row">
+            <div class="partner-avatar" id="partner-avatar">💕</div>
+            <div>
+              <div class="partner-name" id="partner-name">—</div>
+              <div class="partner-status">ваш партнёр</div>
+            </div>
+          </div>
+          <div class="duration-box">
+            <div class="duration-value" id="duration-value">—</div>
+            <div class="duration-label">вместе с <span id="started-at-label">—</span></div>
+          </div>
+
+          <div class="level-box">
+            <div class="level-row">
+              <span class="level-tag" id="level-tag">Уровень 1</span>
+              <span class="level-xp" id="level-xp">0 / 150 XP</span>
+            </div>
+            <div class="level-track"><div class="level-fill" id="level-fill"></div></div>
+          </div>
+
+          <button class="btn btn-ghost" id="unpair-btn">Отвязать партнёра</button>
+        </div>
+
+        <div class="card-block">
+          <div class="card-block-title">Достижения</div>
+          <div class="achv-grid" id="achv-grid"></div>
+        </div>
+      </section>
+
+      <!-- ---------- ВКЛАДКА: АКТИВНОСТИ ---------- -->
+      <section class="tab-panel" id="tab-activities" hidden>
+        <div id="activities-empty" class="card-block" hidden>
+          <p class="card-hint center">Добавьте партнёра на вкладке «Профиль», чтобы начать отмечать активности вместе 💫</p>
+        </div>
+        <div class="activity-grid" id="activities-grid"></div>
+      </section>
+
+      <!-- ---------- ВКЛАДКА: ИГРА ---------- -->
+      <section class="tab-panel" id="tab-game" hidden>
+        <div id="game-empty" class="card-block" hidden>
+          <p class="card-hint center">Добавьте партнёра на вкладке «Профиль», чтобы сыграть вместе 💌</p>
+        </div>
+
+        <div id="game-idle" hidden>
+          <div class="card-block-title tab-heading">Выберите игру</div>
+          <div class="game-type-grid" id="game-type-grid"></div>
+        </div>
+
+        <div id="game-live" hidden>
+          <div class="game-type-pill" id="game-type-pill"></div>
+          <div class="game-top">
+            <div class="progress-track" id="progress-track"></div>
+            <div class="game-counter"><span id="q-index">1</span>/<span id="q-total">10</span></div>
+          </div>
+
+          <div class="question-sticker">
+            <p class="question-text" id="question-text">Загрузка вопроса…</p>
+          </div>
+
+          <div class="answers-stage" id="answers-stage">
+            <div class="answer-slot slot-partner" id="slot-partner" hidden>
+              <div class="bubble-avatar" id="bubble-partner-avatar">💕</div>
+              <div class="bubble bubble-partner">
+                <div class="bubble-name" id="bubble-partner-name">Партнёр</div>
+                <div class="bubble-text" id="bubble-partner-text"></div>
+                <div class="bubble-guess" id="bubble-partner-guess" hidden></div>
+              </div>
+            </div>
+            <div class="answer-slot slot-you" id="slot-you" hidden>
+              <div class="bubble bubble-you">
+                <div class="bubble-name">Вы</div>
+                <div class="bubble-text" id="bubble-you-text"></div>
+                <div class="bubble-guess" id="bubble-you-guess" hidden></div>
+              </div>
+              <div class="bubble-avatar" id="bubble-you-avatar">🙂</div>
+            </div>
+            <p class="waiting-hint" id="waiting-hint" hidden>Ждём ответ партнёра…</p>
+            <p class="next-hint" id="next-hint" hidden>Следующий вопрос через мгновение… 💫</p>
+          </div>
+
+          <form class="answer-bar" id="answer-form">
+            <input class="text-input answer-input" id="guess-input" placeholder="Что, по-вашему, ответит партнёр?" autocomplete="off" maxlength="200" hidden>
+            <input class="text-input answer-input" id="answer-input" placeholder="Ваш ответ…" autocomplete="off" maxlength="200">
+            <button class="send-btn" id="send-btn" type="submit" aria-label="Отправить">➤</button>
+          </form>
+        </div>
+
+        <div id="game-end" class="card-block" hidden>
+          <div class="end-emoji">🎉</div>
+          <h2 class="end-title">Игра окончена!</h2>
+          <p class="card-hint center" id="game-end-xp">Вы прошли игру вместе.</p>
+          <button class="btn btn-primary btn-lg" id="play-again-btn">Выбрать игру</button>
+        </div>
+      </section>
+
+      <!-- ---------- ВКЛАДКА: МАГАЗИН ---------- -->
+      <section class="tab-panel" id="tab-shop" hidden>
+        <div id="shop-empty" class="card-block" hidden>
+          <p class="card-hint center">Добавьте партнёра, чтобы выбирать тему оформления вместе 🎨</p>
+        </div>
+        <p class="card-hint shop-intro" id="shop-intro">Темы меняют оформление приложения для вас обоих. Оплата — в Telegram Stars ⭐, прямо внутри Mini App.</p>
+        <div class="shop-grid" id="shop-grid"></div>
+      </section>
+
+    </main>
+
+    <nav class="tabbar">
+      <button class="tab-btn active" data-tab="profile"><span class="tab-icon">👤</span><span>Профиль</span></button>
+      <button class="tab-btn" data-tab="activities"><span class="tab-icon">📅</span><span>Активности</span></button>
+      <button class="tab-btn" data-tab="game"><span class="tab-icon">🎮</span><span>Игра</span></button>
+      <button class="tab-btn" data-tab="shop"><span class="tab-icon">🛍️</span><span>Магазин</span></button>
+    </nav>
+
+  </div>
+
+  <!-- ================= ШТОРКА: УВЕДОМЛЕНИЯ ================= -->
+  <div class="sheet-overlay" id="notif-overlay" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Уведомления</div>
+      <div class="sheet-body" id="notif-list"></div>
+      <button class="btn btn-ghost" id="notif-close-btn">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- ================= ШТОРКА: КАЛЕНДАРЬ АКТИВНОСТИ ================= -->
+  <div class="sheet-overlay" id="activity-overlay" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title" id="activity-title">Активность</div>
+      <div class="streak-row">
+        <div class="streak-chip"><span id="activity-current-streak">0</span><small>серия сейчас</small></div>
+        <div class="streak-chip"><span id="activity-best-streak">0</span><small>лучшая серия</small></div>
+      </div>
+      <div class="cal-nav">
+        <button class="icon-btn small" id="cal-prev-btn">←</button>
+        <div id="cal-month-label">—</div>
+        <button class="icon-btn small" id="cal-next-btn">→</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <p class="card-hint center">Нажмите на день, чтобы отметить его вместе с партнёром.</p>
+      <button class="btn btn-ghost" id="activity-close-btn">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- ================= ТОСТ: НОВОЕ ДОСТИЖЕНИЕ ================= -->
+  <div class="toast" id="achv-toast" hidden></div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
